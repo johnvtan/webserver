@@ -5,6 +5,7 @@ import (
     "fmt"
     "bufio"
     "log"
+    "webserver/http"
 )
 
 func main() {
@@ -21,19 +22,22 @@ func main() {
         if err != nil {
                 log.Fatal(err)
         }
-        fmt.Println("got a connectoin")
-        handleConnection(conn)
+        fmt.Println("got a connection")
+        go handleConnection(conn)
     }
+
+    fmt.Println("Closing listener")
+    ln.Close();
 }
 
-func handleConnection(conn net.Conn) error {
+// thread per request/response
+func handleConnection(conn net.Conn) {
     reader := bufio.NewReader(conn)
-
-    for {
-        message, _ := reader.ReadString('\n')
-        fmt.Print("Server got: ", string(message))
-        new_msg := "HTTP/1.1 200 OK \r\n"
-        conn.Write([]byte(new_msg + "\r\n"))
+    req, err := http.ParseRequest(reader)
+    if err != nil {
+        fmt.Println(err)
     }
-    return nil
+    fmt.Println("Closing connection")
+    fmt.Println(req)
+    conn.Close()
 }
