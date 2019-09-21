@@ -3,6 +3,7 @@ package http
 import (
     "bufio"
     "fmt"
+    "io"
     "strconv"
     "strings"
 )
@@ -73,10 +74,25 @@ func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
         if len(headerFields) != 2 {
             return request, fmt.Errorf("http.ParseRequest: Bad header line: '%s'", headerLine)
         }
-        headerKey := strings.TrimSpace(headerFields[0])
-        headerVal := strings.TrimSpace(headerFields[1])
-        request.Headers[headerKey] = headerVal
-        fmt.Println(headerLine)
+
+        // fieldName are case insensitive
+        fieldName := strings.ToLower(strings.TrimSpace(headerFields[0]))
+        fieldVal := strings.TrimSpace(headerFields[1])
+        request.Headers[fieldName] = fieldVal
+    }
+
+    // according to rfc 2616, the presence of a message-body is signaled by the inclusion of a
+    // content-length or transfer-encoding header field. For now, only support content-length.
+    if lengthStr, ok := request.Headers["content-length"]; ok {
+        bodyLen, err := strconv.Atoi(lengthStr)
+        if err != nil {
+            return request, err
+        }
+        bodyBuf := make([]byte, bodyLen)
+        if _, err := io.ReadFull(reader, bodyBuf); err != nil {
+            return request, err
+        }
+        request.Body = string(bodyBuf)
     }
 
     return request, nil
