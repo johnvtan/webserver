@@ -64,10 +64,18 @@ func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
     }
 
     // parse header lines
+    request.Headers = make(map[string]string)
     for headerLine, err := reader.ReadString('\n'); headerLine != "\r\n"; headerLine, err = reader.ReadString('\n') {
         if err != nil {
             return request, err
         }
+        headerFields := strings.SplitN(headerLine, ":", 2)
+        if len(headerFields) != 2 {
+            return request, fmt.Errorf("http.ParseRequest: Bad header line: '%s'", headerLine)
+        }
+        headerKey := strings.TrimSpace(headerFields[0])
+        headerVal := strings.TrimSpace(headerFields[1])
+        request.Headers[headerKey] = headerVal
         fmt.Println(headerLine)
     }
 
