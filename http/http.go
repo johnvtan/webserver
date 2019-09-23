@@ -4,6 +4,7 @@ import (
     "bufio"
     "fmt"
     "io"
+    "io/ioutil"
     "strconv"
     "strings"
 )
@@ -13,6 +14,12 @@ type HttpRequest struct {
     URI string
     VersionMajor int
     VersionMinor int
+    Headers map[string]string
+    Body string
+}
+
+type HttpResponse struct {
+    Code string
     Headers map[string]string
     Body string
 }
@@ -70,12 +77,14 @@ func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
         if err != nil {
             return request, err
         }
+
+        // headerFields[1] may contain colons
         headerFields := strings.SplitN(headerLine, ":", 2)
         if len(headerFields) != 2 {
             return request, fmt.Errorf("http.ParseRequest: Bad header line: '%s'", headerLine)
         }
 
-        // fieldName are case insensitive
+        // fieldName is case insensitive
         fieldName := strings.ToLower(strings.TrimSpace(headerFields[0]))
         fieldVal := strings.TrimSpace(headerFields[1])
         request.Headers[fieldName] = fieldVal
@@ -88,6 +97,9 @@ func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
         if err != nil {
             return request, err
         }
+        if bodyLen < 0 {
+            return request, fmt.Errorf("http.ParseRequest: Invalid content length: '%d'", bodyLen)
+        }
         bodyBuf := make([]byte, bodyLen)
         if _, err := io.ReadFull(reader, bodyBuf); err != nil {
             return request, err
@@ -96,4 +108,55 @@ func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
     }
 
     return request, nil
+}
+
+func responseToString(response HttpResponse) string {
+    var ret strings.Builder
+    ret.WriteString("HTTP/1.1 ")
+    switch response.Code {
+    case "200":
+        ret.WriteString("200 OK")
+    case "404":
+        ret.WriteString("404 NOT FOUND")
+    case "501":
+        ret.WriteString("501 NOT IMPLEMENTED")
+    default:
+        panic("http.responseToString: Got unrecognized HTTP code")
+    }
+    ret.WriteString("\r\n")
+
+    for key, val := range response.Headers {
+        ret.WriteString(key)
+        ret.WriteString(": ")
+        ret.WriteString(val)
+        ret.WriteString("\r\n")
+    }
+    ret.WriteString("\r\n")
+    ret.WriteString(response.Body)
+    ret.WriteString("\r\n")
+    return ret.String()
+}
+
+func ServeAddress(uri string, code string) string {
+    var response HttpResponse
+    response.Code = code
+
+    // slice off leading / character
+    body, err := ioutil.ReadFile(uri[1:])
+    if err != nil {
+        panic("http.ServeAddress: File not found")
+    }
+
+    response.Body = string(body)
+
+    response.Headers = make(map[string]string)
+    response.Headers["Content-Type"] = "text/html; charset=UTF-8"
+    return responseToString(response)
+}
+
+func Serve501() string {
+    var response HttpResponse
+    response.Code = "501"
+    response.Headers = make(map[string]string)
+    return responseToString(response)
 }

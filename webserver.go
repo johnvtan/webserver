@@ -11,6 +11,7 @@ import (
 func main() {
     fmt.Println("Starting Server...")
     ln, err := net.Listen("tcp", ":8081")
+    defer ln.Close()
     if err != nil {
         log.Fatal(err)
     }
@@ -25,19 +26,30 @@ func main() {
         fmt.Println("got a connection")
         go handleConnection(conn)
     }
-
-    fmt.Println("Closing listener")
-    ln.Close();
 }
 
 // thread per request/response
 func handleConnection(conn net.Conn) {
+    defer conn.Close()
+
     reader := bufio.NewReader(conn)
     req, err := http.ParseRequest(reader)
     if err != nil {
         fmt.Println(err)
+        return
     }
-    fmt.Println("Closing connection")
-    fmt.Println(req)
-    conn.Close()
+
+    code := "200"
+    switch req.Method {
+    case "GET":
+        if req.URI == "/" {
+            req.URI = "/hello.html"
+        } else if req.URI != "/hello.html" {
+            code = "404"
+            req.URI = "/404.html"
+        }
+        conn.Write([]byte(http.ServeAddress(req.URI, code)))
+    default:
+        conn.Write([]byte(http.Serve501()))
+    }
 }
