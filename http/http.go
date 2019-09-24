@@ -24,6 +24,13 @@ type HttpResponse struct {
     Body string
 }
 
+func methodImplemented(method string) bool {
+    if method == "GET" || method == "HEAD" || method == "POST" {
+        return true
+    }
+    return false
+}
+
 func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
     var request HttpRequest
 
@@ -39,8 +46,7 @@ func ParseRequest(reader *bufio.Reader) (HttpRequest, error) {
         return request, fmt.Errorf("http.ParseRequest: Malformed request line - %s", requestLine)
     }
 
-    // parse request type - only supports get and post for now
-    if requestLineFields[0] == "GET" || requestLineFields[0] == "POST" {
+    if methodImplemented(requestLineFields[0]) {
         request.Method = requestLineFields[0]
     } else {
         return request, fmt.Errorf("http.ParseRequest: Unimplemented request type %s", requestLineFields[0])
@@ -137,20 +143,30 @@ func responseToString(response HttpResponse) string {
     return ret.String()
 }
 
-func ServeAddress(uri string, code string) string {
+func serveGetHeader(uri string, code string) HttpResponse {
     var response HttpResponse
     response.Code = code
+
+    // for now, hard code headers
+    response.Headers = make(map[string]string)
+    response.Headers["Content-Type"] = "text/html; charset=UTF-8"
+    return response
+}
+
+func ServeGet(uri string, code string) string {
+    response := serveGetHeader(uri, code)
 
     // slice off leading / character
     body, err := ioutil.ReadFile(uri[1:])
     if err != nil {
         panic("http.ServeAddress: File not found")
     }
-
     response.Body = string(body)
+    return responseToString(response)
+}
 
-    response.Headers = make(map[string]string)
-    response.Headers["Content-Type"] = "text/html; charset=UTF-8"
+func ServeHead(uri string, code string) string {
+    response := serveGetHeader(uri, code)
     return responseToString(response)
 }
 

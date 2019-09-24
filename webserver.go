@@ -29,6 +29,33 @@ func main() {
     }
 }
 
+func fileInDir(name string) bool {
+    files, _ := ioutil.ReadDir(".")
+    for _, f := range files {
+        if name == f.Name() {
+            return true
+        }
+    }
+
+    return false
+}
+
+func getUriAndCode(uri string) (string, string) {
+    var retUri string
+    var code string
+    if uri == "/" {
+        retUri = "/hello.html"
+        code = "200"
+    } else if fileInDir(uri[1:]) {
+        retUri = uri
+        code = "200"
+    } else {
+        retUri = "/404.html"
+        code = "404"
+    }
+    return retUri, code
+}
+
 // thread per request/response
 func handleConnection(conn net.Conn) {
     defer conn.Close()
@@ -40,31 +67,13 @@ func handleConnection(conn net.Conn) {
         return
     }
 
-    code := "404"
     switch req.Method {
     case "GET":
-        if req.URI == "/" {
-            req.URI = "/hello.html"
-        }
-
-        // check if the file exists in this directory
-        files, err := ioutil.ReadDir(".")
-        if err != nil {
-            fmt.Println(err)
-            return
-        }
-        for _, f := range files {
-            if req.URI[1:] == f.Name() {
-                code = "200"
-                break
-            }
-        }
-
-        // if we still haven't found it, set URI to 404 
-        if code == "404" {
-            req.URI = "/404.html"
-        }
-        conn.Write([]byte(http.ServeAddress(req.URI, code)))
+        uri, code := getUriAndCode(req.URI)
+        conn.Write([]byte(http.ServeGet(uri, code)))
+    case "HEAD":
+        uri, code := getUriAndCode(req.URI)
+        conn.Write([]byte(http.ServeHead(uri, code)))
     default:
         conn.Write([]byte(http.Serve501()))
     }
