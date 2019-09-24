@@ -1,6 +1,7 @@
 package main
 
 import (
+    "io/ioutil"
     "net"
     "fmt"
     "bufio"
@@ -39,13 +40,28 @@ func handleConnection(conn net.Conn) {
         return
     }
 
-    code := "200"
+    code := "404"
     switch req.Method {
     case "GET":
         if req.URI == "/" {
             req.URI = "/hello.html"
-        } else if req.URI != "/hello.html" {
-            code = "404"
+        }
+
+        // check if the file exists in this directory
+        files, err := ioutil.ReadDir(".")
+        if err != nil {
+            fmt.Println(err)
+            return
+        }
+        for _, f := range files {
+            if req.URI[1:] == f.Name() {
+                code = "200"
+                break
+            }
+        }
+
+        // if we still haven't found it, set URI to 404 
+        if code == "404" {
             req.URI = "/404.html"
         }
         conn.Write([]byte(http.ServeAddress(req.URI, code)))
